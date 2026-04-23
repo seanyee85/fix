@@ -9,9 +9,9 @@ if [[ -z "$DB_INFO" ]]; then
     echo "No MySQL/MariaDB client found"
 elif [[ $DB_INFO == *"MariaDB"* ]]; then
     echo "MariaDB detected"
-elif [[ $DB_INFO == *"Ver 8.0"* ]]; then
-    echo "MySQL 8.0 detected"
-    # Ensure versionlock plugin is installed
+elif [[ $DB_INFO == *"Ver 8.0"* ]] || [[ $DB_INFO == *"Ver 8.4"* ]]; then
+    echo "MySQL ${DB_INFO} detected"
+   # Ensure versionlock plugin is installed
     dnf install -y 'dnf-command(versionlock)'
     dnf versionlock add mysql-community-*
 elif [[ $DB_INFO == *"Ver 9.7"* ]]; then
