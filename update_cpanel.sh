@@ -1,13 +1,19 @@
 #!/bin/bash
 # update_cpanel.sh
-# Force update cPanel, check version, and restart cpsrvd
+# Force update cPanel, check version, and restart cpsrvd with progress output
 
 LOGFILE="/var/log/update_cpanel.log"
 
-echo "===== Starting cPanel update at $(date) =====" >> $LOGFILE
+echo "===== Starting cPanel update at $(date) =====" | tee -a $LOGFILE
 
-/scripts/upcp --force >> $LOGFILE 2>&1
-/usr/local/cpanel/cpanel -V >> $LOGFILE 2>&1
-/scripts/restartsrv_cpsrvd --hard >> $LOGFILE 2>&1
+echo "[*] Running cPanel update..."
+/scripts/upcp --force 2>&1 | tee -a $LOGFILE
 
-echo "===== Completed cPanel update at $(date) =====" >> $LOGFILE
+echo "[*] Checking cPanel version..."
+/usr/local/cpanel/cpanel -V 2>&1 | tee -a $LOGFILE
+
+echo "[*] Restarting cpsrvd service..."
+/scripts/restartsrv_cpsrvd --hard 2>&1 | tee -a $LOGFILE
+
+echo "===== Completed cPanel update at $(date) =====" | tee -a $LOGFILE
+
