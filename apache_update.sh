@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# Apache Update Script
-# --------------------
+# Apache Update Script (Imunify360/AV servers)
+# --------------------------------------------
 # Order of checks:
 # 1. Apache version (skip if already 2.4.67)
 # 2. LiteSpeed (skip if running)
 # 3. CloudLinux (priority, cl-ea4-testing repo)
-# 4. Imunify360 (valid license → hardened repo)
-# 5. ImunifyAV (always → standard update)
+# 4. Imunify360 (service + license-aware)
+# 5. ImunifyAV (only if no Imunify360)
 # 6. Fallback (standard update)
 #
 # Logs all actions to /var/log/apache_update.log
@@ -50,40 +50,35 @@ if grep -qi "CloudLinux" /etc/os-release; then
     log "CloudLinux detected - updating Apache with cl-ea4-testing repo"
     yum update ea-apache24 --enablerepo=cl-ea4-testing -y | tee -a "$LOGFILE"
 
-    if rpm -qa | grep -q '^imunify360'; then
-        log "CloudLinux + Imunify360 detected - patch already done since CloudLinux handled it"
-    fi
+# Step 4: Imunify360 check
+elif systemctl is-active --quiet imunify360.service; then
+    LICENSE_TYPE=$(imunify360-agent config show --json -v | jq -r '.license.license_type' 2>/dev/null)
+    LICENSE_STATUS=$(imunify360-agent rstatus 2>/dev/null)
 
-# Step 4: Imunify360 / ImunifyAV check
-else
-    LICENSE_TYPE=$(imunify360-agent config show --json -v 2>/dev/null | jq -r '.license.license_type' 2>/dev/null)
-
-    if [[ "$LICENSE_TYPE" == "imunify360" ]]; then
-        LICENSE_STATUS=$(imunify360-agent rstatus 2>/dev/null)
-        if [[ "$LICENSE_STATUS" == "OK" ]]; then
-            log "Valid Imunify360 license detected - updating Apache with hardened beta repo"
-            yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
-        else
-            log "Imunify360 license invalid/expired - falling back to standard Apache update"
-            dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a "$LOGFILE"
-        fi
-
-    elif command -v imunify-antivirus >/dev/null 2>&1; then
-        LICENSE_STATUS=$(imunify-antivirus rstatus 2>/dev/null)
-        if [[ "$LICENSE_STATUS" == "OK" ]]; then
-            log "ImunifyAV detected - running standard Apache update"
-            dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a "$LOGFILE"
-        else
-            log "ImunifyAV detected but rstatus not OK - still running standard Apache update"
-            dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a "$LOGFILE"
-        fi
-
+    if [[ "$LICENSE_TYPE" == "Imunify360" && "$LICENSE_STATUS" == "OK" ]]; then
+        log "Imunify360 service running with valid license - updating Apache with hardened repo"
+        yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
     else
-        log "No Imunify product detected - running standard Apache update"
+        log "Imunify360 detected but license invalid/expired - running standard Apache update"
         dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a "$LOGFILE"
     fi
+
+# Step 5: ImunifyAV check
+elif command -v imunify-antivirus >/dev/null 2>&1; then
+    LICENSE_STATUS=$(imunify-antivirus rstatus 2>/dev/null)
+    if [[ "$LICENSE_STATUS" == "OK" ]]; then
+        log "ImunifyAV detected - running standard Apache update"
+    else
+        log "ImunifyAV detected but rstatus not OK - still running standard Apache update"
+    fi
+    dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a "$LOGFILE"
+
+# Step 6: Fallback
+else
+    log "No Imunify product detected - running standard Apache update"
+    dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a "$LOGFILE"
 fi
 
-# Step 5: Log Apache version after update
+# Step 7: Log Apache version after update
 log "Apache version after update:"
 apache_version
