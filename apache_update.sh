@@ -2,9 +2,10 @@
 #
 # Apache Update Logic Script
 # --------------------------
-# Detects LiteSpeed Web Server, Imunify360, and CloudLinux,
-# then applies the correct update path. Logs all actions to
-# /var/log/apache_update.log for auditing.
+# Checks Apache version first. If already 2.4.67, no action.
+# Then LiteSpeed, then CloudLinux (priority), then Imunify360,
+# and finally falls back to dnf update.
+# Logs all actions to /var/log/apache_update.log.
 #
 
 LOGFILE="/var/log/apache_update.log"
@@ -21,20 +22,42 @@ apache_version() {
     fi
 }
 
-# Log current Apache version before update
-log "Current Apache version:"
-apache_version
+# Step 1: Check Apache version first
+CURRENT_VER=$(httpd -v 2>/dev/null | grep 'Server version' | awk '{print $3}' | cut -d/ -f2)
+if [[ "$CURRENT_VER" == "2.4.67" ]]; then
+    log "Apache version is already 2.4.67 - no action taken"
+    exit 0
+else
+    log "Apache version is $CURRENT_VER - proceeding with update checks"
+fi
 
-# Detect LiteSpeed Web Server
+# Step 2: LiteSpeed check
 if systemctl list-unit-files | grep -q lshttpd.service || command -v lswsctrl >/dev/null 2>&1; then
     log "Got LiteSpeed Web Server - no action taken"
 
-# Detect Imunify360 (RPM)
-elif rpm -qa | grep -q '^imunify360'; then
-    log "Imunify360 detected - updating Apache with hardened beta repo"
-    yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
-
-# Detect CloudLinux
+# Step 3: CloudLinux check (priority)
 elif grep -qi "CloudLinux" /etc/os-release; then
     log "CloudLinux detected - updating Apache with cl-ea4-testing repo"
-    yum update ea-apache24 --enablerepo=cl-ea4-testing -y | tee -a "$LOG
+    yum update ea-apache24 --enablerepo=cl-ea4-testing -y | tee -a "$LOGFILE"
+
+    # Step 4: If Imunify360 also present, log after CloudLinux update
+    if rpm -qa | grep -q '^imunify360'; then
+        log "CloudLinux + Imunify360 detected - patch already done since CloudLinux handled it"
+    fi
+
+# Step 4 (alternate): Imunify360 check (only if no CloudLinux)
+elif rpm -qa | grep -q '^imunify360'; then
+    log "Imunify360 detected without CloudLinux - updating Apache with hardened beta repo"
+    yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
+
+# Step 5: Fallback branch
+else
+    log "Fallback branch - cleaning metadata, rebuilding cache, updating Apache"
+    dnf clean all | tee -a "$LOGFILE"
+    dnf makecache | tee -a "$LOGFILE"
+    dnf -y update ea-apache* | tee -a "$LOGFILE"
+fi
+
+# Log Apache version after update
+log "Apache version after update:"
+apache_version
