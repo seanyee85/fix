@@ -3,7 +3,8 @@
 # Apache Update Logic Script
 # --------------------------
 # Checks Apache version first. If already 2.4.67, no action.
-# Then LiteSpeed, then CloudLinux (priority), then Imunify360,
+# Then LiteSpeed (must be active in WHM or running),
+# then CloudLinux (priority), then Imunify360,
 # and finally falls back to dnf update.
 # Logs all actions to /var/log/apache_update.log.
 #
@@ -31,21 +32,24 @@ else
     log "Apache version is $CURRENT_VER - proceeding with update checks"
 fi
 
-# Step 2: LiteSpeed check
-if systemctl list-unit-files | grep -q lshttpd.service || command -v lswsctrl >/dev/null 2>&1; then
-    log "Got LiteSpeed Web Server - no action taken"
+# Step 2: LiteSpeed check (WHM-aware, must be active)
+if /usr/local/cpanel/bin/whmapi1 get_tweaksetting key=apache_server 2>/dev/null | grep -q "litespeed"; then
+    log "LiteSpeed Web Server is active in WHM - no action taken"
+    exit 0
+elif systemctl is-active --quiet lshttpd.service; then
+    log "LiteSpeed Web Server service is running - no action taken"
+    exit 0
 
 # Step 3: CloudLinux check (priority)
 elif grep -qi "CloudLinux" /etc/os-release; then
     log "CloudLinux detected - updating Apache with cl-ea4-testing repo"
     yum update ea-apache24 --enablerepo=cl-ea4-testing -y | tee -a "$LOGFILE"
 
-    # Step 4: If Imunify360 also present, log after CloudLinux update
     if rpm -qa | grep -q '^imunify360'; then
         log "CloudLinux + Imunify360 detected - patch already done since CloudLinux handled it"
     fi
 
-# Step 4 (alternate): Imunify360 check (only if no CloudLinux)
+# Step 4: Imunify360 check (only if no CloudLinux)
 elif rpm -qa | grep -q '^imunify360'; then
     log "Imunify360 detected without CloudLinux - updating Apache with hardened beta repo"
     yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
