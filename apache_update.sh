@@ -79,7 +79,7 @@ elif systemctl is-active --quiet imunify360.service; then
         retry_update "yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a $LOGFILE"
     else
         log "Imunify360 detected but license not OK - running standard Apache update"
-        retry_update "dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a $LOGFILE"
+        retry_update "dnf -y update ea-apache* | tee -a $LOGFILE"
     fi
 
 # Step 5: ImunifyAV check
@@ -90,12 +90,12 @@ elif command -v imunify-antivirus >/dev/null 2>&1; then
     else
         log "ImunifyAV detected but rstatus not OK - still running standard Apache update"
     fi
-    retry_update "dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a $LOGFILE"
+    retry_update "dnf -y update ea-apache* | tee -a $LOGFILE"
 
 # Step 6: Fallback
 else
     log "No Imunify product detected - running standard Apache update"
-    retry_update "dnf clean all && dnf makecache && dnf -y update ea-apache* | tee -a $LOGFILE"
+    retry_update "dnf -y update ea-apache* | tee -a $LOGFILE"
 fi
 
 # Step 7: Log Apache version after update
