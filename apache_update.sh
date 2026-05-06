@@ -4,7 +4,8 @@
 # --------------------------
 # Checks Apache version first. If already 2.4.67, no action.
 # Then LiteSpeed (must be running), then CloudLinux (priority),
-# then Imunify360, and finally falls back to dnf update.
+# then Imunify360 (valid license), then ImunifyAV,
+# and finally falls back to dnf update.
 # Logs all actions to /var/log/apache_update.log.
 #
 
@@ -48,17 +49,27 @@ elif grep -qi "CloudLinux" /etc/os-release; then
         log "CloudLinux + Imunify360 detected - patch already done since CloudLinux handled it"
     fi
 
-# Step 4: Imunify360 check (only if no CloudLinux)
-elif rpm -qa | grep -q '^imunify360'; then
-    log "Imunify360 detected without CloudLinux - updating Apache with hardened beta repo"
-    yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
-
-# Step 5: Fallback branch
+# Step 4: Imunify360 / ImunifyAV check (only if no CloudLinux)
 else
-    log "Fallback branch - cleaning metadata, rebuilding cache, updating Apache"
-    dnf clean all | tee -a "$LOGFILE"
-    dnf makecache | tee -a "$LOGFILE"
-    dnf -y update ea-apache* | tee -a "$LOGFILE"
+    LICENSE_TYPE=$(imunify360-agent config show --json -v 2>/dev/null | jq -r '.license.license_type')
+    LICENSE_STATUS=$(imunify360-agent rstatus 2>/dev/null | grep -i "status" | awk '{print $2}')
+
+    if [[ "$LICENSE_TYPE" == "Imunify360" && "$LICENSE_STATUS" == "active" ]]; then
+        log "Valid Imunify360 license detected - updating Apache with hardened beta repo"
+        yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
+
+    elif [[ "$LICENSE_TYPE" == "ImunifyAV" ]]; then
+        log "ImunifyAV license detected - running standard Apache update"
+        dnf clean all | tee -a "$LOGFILE"
+        dnf makecache | tee -a "$LOGFILE"
+        dnf -y update ea-apache* | tee -a "$LOGFILE"
+
+    else
+        log "No valid Imunify license detected - falling back to standard Apache update"
+        dnf clean all | tee -a "$LOGFILE"
+        dnf makecache | tee -a "$LOGFILE"
+        dnf -y update ea-apache* | tee -a "$LOGFILE"
+    fi
 fi
 
 # Log Apache version after update
