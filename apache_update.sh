@@ -27,25 +27,6 @@ apache_version() {
     fi
 }
 
-# Retry wrapper for yum/dnf commands
-retry_update() {
-    local cmd="$1"
-    local max_attempts=5
-    local attempt=1
-    local delay=60
-
-    until bash -c "$cmd"; do
-        log "Attempt $attempt failed – retrying in $delay seconds..."
-        if (( attempt >= max_attempts )); then
-            log "All $max_attempts attempts failed – aborting."
-            return 1
-        fi
-        attempt=$((attempt+1))
-        sleep $delay
-    done
-    return 0
-}
-
 # Step 1: Check Apache version
 CURRENT_VER=$(httpd -v 2>/dev/null | grep 'Server version' | awk '{print $3}' | cut -d/ -f2)
 if [[ "$CURRENT_VER" == "2.4.67" ]]; then
@@ -67,7 +48,7 @@ fi
 # Step 3: CloudLinux check
 if grep -qi "CloudLinux" /etc/os-release; then
     log "CloudLinux detected - updating Apache with cl-ea4-testing repo"
-    retry_update "yum update ea-apache24 --enablerepo=cl-ea4-testing -y | tee -a $LOGFILE"
+    yum update ea-apache24 --enablerepo=cl-ea4-testing -y | tee -a "$LOGFILE"
 
 # Step 4: Imunify360 check
 elif systemctl is-active --quiet imunify360.service; then
@@ -76,10 +57,10 @@ elif systemctl is-active --quiet imunify360.service; then
 
     if [[ "$LICENSE_TYPE" == "imunify360" && "$LICENSE_STATUS" == "OK" ]]; then
         log "Imunify360 service running with valid license - updating Apache with hardened repo"
-        retry_update "yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a $LOGFILE"
+        yum update ea-apache24* --enablerepo=imunify360-ea-php-hardened-beta -y | tee -a "$LOGFILE"
     else
         log "Imunify360 detected but license not OK - running standard Apache update"
-        retry_update "dnf -y update ea-apache* | tee -a $LOGFILE"
+        dnf -y update ea-apache* | tee -a "$LOGFILE"
     fi
 
 # Step 5: ImunifyAV check
@@ -90,12 +71,12 @@ elif command -v imunify-antivirus >/dev/null 2>&1; then
     else
         log "ImunifyAV detected but rstatus not OK - still running standard Apache update"
     fi
-    retry_update "dnf -y update ea-apache* | tee -a $LOGFILE"
+    dnf -y update ea-apache* | tee -a "$LOGFILE"
 
 # Step 6: Fallback
 else
     log "No Imunify product detected - running standard Apache update"
-    retry_update "dnf -y update ea-apache* | tee -a $LOGFILE"
+    dnf -y update ea-apache* | tee -a "$LOGFILE"
 fi
 
 # Step 7: Log Apache version after update
