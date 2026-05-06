@@ -3,9 +3,8 @@
 # Apache Update Logic Script
 # --------------------------
 # Checks Apache version first. If already 2.4.67, no action.
-# Then LiteSpeed (must be active in WHM or running),
-# then CloudLinux (priority), then Imunify360,
-# and finally falls back to dnf update.
+# Then LiteSpeed (must be running), then CloudLinux (priority),
+# then Imunify360, and finally falls back to dnf update.
 # Logs all actions to /var/log/apache_update.log.
 #
 
@@ -32,12 +31,12 @@ else
     log "Apache version is $CURRENT_VER - proceeding with update checks"
 fi
 
-# Step 2: LiteSpeed check (WHM-aware, must be active)
-if /usr/local/cpanel/bin/whmapi1 get_tweaksetting key=apache_server 2>/dev/null | grep -q "litespeed"; then
-    log "LiteSpeed Web Server is active in WHM - no action taken"
-    exit 0
-elif systemctl is-active --quiet lshttpd.service; then
+# Step 2: LiteSpeed check (must be running)
+if systemctl is-active --quiet lshttpd.service; then
     log "LiteSpeed Web Server service is running - no action taken"
+    exit 0
+elif command -v lswsctrl >/dev/null 2>&1 && lswsctrl status 2>/dev/null | grep -qi "running"; then
+    log "LiteSpeed Web Server is running (via lswsctrl) - no action taken"
     exit 0
 
 # Step 3: CloudLinux check (priority)
