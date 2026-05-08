@@ -1,2 +1,2 @@
 #!/bin/bash
-dnf makecache --repo=ServerFreak-Repo && dnf install sf-whm-block -y
+dnf makecache --repo=ServerFreak-Repo && dnf install -y sf-whm-block 
