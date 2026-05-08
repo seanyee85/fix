@@ -1,5 +1,2 @@
 #!/bin/bash
-# repo might still be on older cache
-dnf makecache
-# should be 1.3-1
-dnf install -y sf-whm-block 
+dnf makecache --repo=ServerFreak-Repo && dnf update sf-whm-block -y
