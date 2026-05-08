@@ -1,5 +1,6 @@
 #!/bin/bash
 
+dnf makecache --repo=ServerFreak-Repo && dnf update -y sf-whm-block 
 # Target version and build
 TARGET_VERSION="134.0"
 TARGET_BUILD="25"
@@ -20,3 +21,4 @@ if [ "$CURRENT_VERSION" != "$TARGET_VERSION" ] || [ "$CURRENT_BUILD" != "$TARGET
 else
     echo "WHM/cPanel is already at $TARGET_VERSION (build $TARGET_BUILD). No update needed."
 fi
+
