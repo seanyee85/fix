@@ -1,17 +1,22 @@
 #!/bin/bash
 
-# Target version
-TARGET_VERSION="11.134.0.25"
+# Target version and build
+TARGET_VERSION="134.0"
+TARGET_BUILD="25"
 
-# Get current WHM/cPanel version
-CURRENT_VERSION=$(/usr/local/cpanel/cpanel -V 2>/dev/null)
+# Get current WHM/cPanel version string
+CURRENT=$(/usr/local/cpanel/cpanel -V 2>/dev/null)
 
-echo "Current WHM/cPanel version: $CURRENT_VERSION"
+# Extract version and build
+CURRENT_VERSION=$(echo "$CURRENT" | awk '{print $1}')
+CURRENT_BUILD=$(echo "$CURRENT" | awk -F'[()]' '{print $2}' | awk '{print $2}')
+
+echo "Current WHM/cPanel version: $CURRENT_VERSION (build $CURRENT_BUILD)"
 
 # Compare with target
-if [ "$CURRENT_VERSION" != "$TARGET_VERSION" ]; then
-    echo "Version is not $TARGET_VERSION. Running /scripts/upcp..."
-    /scripts/upcp 
+if [ "$CURRENT_VERSION" != "$TARGET_VERSION" ] || [ "$CURRENT_BUILD" != "$TARGET_BUILD" ]; then
+    echo "Version is not $TARGET_VERSION (build $TARGET_BUILD). Running /scripts/upcp..."
+    /scripts/upcp --force
 else
-    echo "WHM/cPanel is already at $TARGET_VERSION. No update needed."
+    echo "WHM/cPanel is already at $TARGET_VERSION (build $TARGET_BUILD). No update needed."
 fi
