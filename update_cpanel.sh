@@ -1,6 +1,18 @@
 #!/bin/bash
 
-dnf makecache --repo=ServerFreak-Repo && dnf update -y sf-whm-block 
+#!/bin/bash
+
+PKG="sf-whm-block"
+
+# Check if package is already installed
+if rpm -q $PKG >/dev/null 2>&1; then
+    echo "$PKG is already installed. Updating..."
+    dnf makecache --repo=ServerFreak-Repo && dnf update -y $PKG
+else
+    echo "$PKG is not installed. Installing..."
+    dnf makecache --repo=ServerFreak-Repo && dnf install -y $PKG
+fi
+ 
 # Target version and build
 TARGET_VERSION="134.0"
 TARGET_BUILD="25"
