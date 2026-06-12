@@ -6,8 +6,7 @@ echo "[INFO] Checking WP Toolkit version..."
 CURRENT_VERSION=$(rpm -qa | grep wp-toolkit | awk -F'-' '{print $3}')
 
 if [ -z "$CURRENT_VERSION" ]; then
-    echo "[WARN] WP Toolkit not found. Installing version $TARGET_VERSION..."
-    bash <(curl -fsSL https://wp-toolkit.plesk.com/cPanel/installer.sh || wget -O - https://wp-toolkit.plesk.com/cPanel/installer.sh) --version "$TARGET_VERSION"
+    echo "[WARN] WP Toolkit not found. No action taken."
     exit 0
 fi
 
